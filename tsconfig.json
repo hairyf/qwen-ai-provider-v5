@@ -5,8 +5,8 @@
     "target": "ES2018",
     "jsx": "react-jsx",
     "lib": ["dom", "ES2021"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "paths": {
       "@/*": ["./src/*"] 
     },

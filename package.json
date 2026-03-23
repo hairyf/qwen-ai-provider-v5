@@ -1,6 +1,6 @@
 {
   "name": "qwen-ai-provider-v5",
-  "type": "commonjs",
+  "type": "module",
   "version": "2.1.0",
   "packageManager": "pnpm@10.2.0",
   "description": "Vercel AI Provider v6 for running Qwen AI models",
@@ -22,18 +22,21 @@
     "vercel",
     "ai-sdk v6"
   ],
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.mts",
   "files": [
-    "dist/**/*"
+    "dist"
   ],
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup -d --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "lint": "eslint \"./**/*.ts*\"",
     "test": "pnpm test:node && pnpm test:edge && pnpm test:dom",
     "test:dom": "vitest --config vitest.dom.config.mjs --run",
@@ -41,14 +44,14 @@
     "test:node": "vitest --config vitest.node.config.mjs --run",
     "test:integration": "vitest --config vitest.node.config.mjs --run src/__tests__/integration/",
     "coverage": "vitest run --coverage",
-    "type-check": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "prettier-check": "prettier --check \"./**/*.ts*\"",
     "clean": "rm -rf dist",
     "prepare": "husky",
     "prepack": "pnpm build",
     "ci:release": "pnpm clean && pnpm build && changeset publish",
     "ci:version": "changeset version && pnpm install --no-frozen-lockfile",
-    "validate": "pnpm test && pnpm type-check && pnpm lint"
+    "validate": "pnpm test && pnpm typecheck && pnpm lint"
   },
   "peerDependencies": {
     "zod": "^3.25.76 || ^4.1.8"
@@ -78,9 +81,10 @@
     "jsdom": "^29.0.1",
     "msw": "^2.11.6",
     "prettier": "^3.4.2",
+    "publint": "^0.3.18",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tsup": "^8.3.6",
+    "tsdown": "^0.21.4",
     "typescript": "^5.7.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.0.5",
