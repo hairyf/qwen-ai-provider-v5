@@ -394,6 +394,68 @@ describe("doStream", () => {
     })
   })
 
+  it("should retry stream request on retryable errors", async () => {
+    vi.useFakeTimers()
+
+    let fetchCalls = 0
+
+    const provider = createQwen({
+      baseURL: "https://my.api.com/v1/",
+      headers: {
+        Authorization: `Bearer test-api-key`,
+      },
+      fetch: async (_url, init) => {
+        fetchCalls++
+
+        if (init?.body) {
+          requestBody = JSON.parse(init.body as string)
+        }
+
+        if (fetchCalls === 1) {
+          return new Response(JSON.stringify({
+            object: "error",
+            message: "InternalServerError: list index out of range",
+            type: "InternalServerError",
+            param: null,
+            code: null,
+          }), {
+            status: 500,
+            headers: { "content-type": "application/json" },
+          })
+        }
+
+        const encoder = new TextEncoder()
+        const stream = new ReadableStream({
+          start(controller) {
+            for (const chunk of responseChunks) {
+              controller.enqueue(encoder.encode(chunk))
+            }
+            controller.close()
+          },
+        })
+
+        return new Response(stream, {
+          headers: responseHeaders,
+        })
+      },
+    })
+
+    const model = provider.completion("qwen-plus")
+    const promise = model.doStream({
+      prompt: TEST_PROMPT,
+    })
+
+    await vi.runAllTimersAsync()
+
+    const { stream } = await promise
+    await convertReadableStreamToArray(stream)
+
+    expect(fetchCalls).toBe(2)
+    expect(requestBody).toMatchObject({ stream: true })
+
+    vi.useRealTimers()
+  })
+
   it("should handle unparsable stream parts", async () => {
     responseChunks = [`data: {unparsable}\n\n`, "data: [DONE]\n\n"]
     const provider = createStreamingTestProvider()

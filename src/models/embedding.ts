@@ -14,6 +14,7 @@ import {
 } from "@ai-sdk/provider-utils"
 import { z } from "zod"
 import { defaultQwenErrorStructure } from "../error"
+import { isRetryableQwenRequestError, withRetries } from "../utils/retry"
 
 interface QwenEmbeddingConfig {
   /**
@@ -105,31 +106,36 @@ export class QwenEmbeddingModel implements EmbeddingModelV3 {
     const specificProviderOptions = providerOptions?.[providerOptionsName]
 
     // Post the JSON payload to the API endpoint.
-    const { responseHeaders, value: response } = await postJsonToApi({
-      url: this.config.url({
-        path: "/embeddings",
-        modelId: this.modelId,
+    const { responseHeaders, value: response } = await withRetries(
+      () => postJsonToApi({
+        url: this.config.url({
+          path: "/embeddings",
+          modelId: this.modelId,
+        }),
+        headers: combineHeaders(this.config.headers(), headers),
+        body: {
+          model: this.modelId,
+          input: values,
+          encoding_format: "float",
+          dimensions: this.settings.dimensions,
+          user: this.settings.user,
+          ...specificProviderOptions,
+        },
+        failedResponseHandler: createJsonErrorResponseHandler(
+          this.config.errorStructure ?? defaultQwenErrorStructure,
+        ),
+        successfulResponseHandler: createJsonResponseHandler(
+          qwenTextEmbeddingResponseSchema,
+        ),
+        abortSignal,
+        fetch: this.config.fetch,
       }),
-      headers: combineHeaders(this.config.headers(), headers),
-      body: {
-        model: this.modelId,
-        input: values,
-        encoding_format: "float",
-        dimensions: this.settings.dimensions,
-        user: this.settings.user,
-        ...specificProviderOptions,
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal,
       },
-      // Handle response errors using the provided error structure.
-      failedResponseHandler: createJsonErrorResponseHandler(
-        this.config.errorStructure ?? defaultQwenErrorStructure,
-      ),
-      // Process successful responses based on a minimal schema.
-      successfulResponseHandler: createJsonResponseHandler(
-        qwenTextEmbeddingResponseSchema,
-      ),
-      abortSignal,
-      fetch: this.config.fetch,
-    })
+    )
 
     // Map response data to V3 output format.
     return {

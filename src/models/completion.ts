@@ -33,6 +33,7 @@ import { buildUsage } from "../utils/build-usage"
 import { convertToQwenCompletionPrompt } from "../utils/convert-to-completion-prompt"
 import { getResponseMetadata } from "../utils/get-response-metadata"
 import { mapQwenFinishReason } from "../utils/map-finish-reason"
+import { isRetryableQwenRequestError, withRetries } from "../utils/retry"
 
 interface QwenCompletionConfig {
   provider: string
@@ -203,20 +204,27 @@ export class QwenCompletionLanguageModel implements LanguageModelV3 {
       responseHeaders,
       value: response,
       rawValue: parsedBody,
-    } = await postJsonToApi({
-      url: this.config.url({
-        path: "/completions",
-        modelId: this.modelId,
+    } = await withRetries(
+      () => postJsonToApi({
+        url: this.config.url({
+          path: "/completions",
+          modelId: this.modelId,
+        }),
+        headers: combineHeaders(this.config.headers(), options.headers),
+        body: args,
+        failedResponseHandler: this.failedResponseHandler,
+        successfulResponseHandler: createJsonResponseHandler(
+          QwenCompletionResponseSchema,
+        ),
+        abortSignal: options.abortSignal,
+        fetch: this.config.fetch,
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
-      body: args,
-      failedResponseHandler: this.failedResponseHandler,
-      successfulResponseHandler: createJsonResponseHandler(
-        QwenCompletionResponseSchema,
-      ),
-      abortSignal: options.abortSignal,
-      fetch: this.config.fetch,
-    })
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal: options.abortSignal,
+      },
+    )
 
     const choice = response.choices[0]
 
@@ -263,20 +271,27 @@ export class QwenCompletionLanguageModel implements LanguageModelV3 {
       stream: true,
     }
 
-    const { responseHeaders, value: response } = await postJsonToApi({
-      url: this.config.url({
-        path: "/completions",
-        modelId: this.modelId,
+    const { responseHeaders, value: response } = await withRetries(
+      () => postJsonToApi({
+        url: this.config.url({
+          path: "/completions",
+          modelId: this.modelId,
+        }),
+        headers: combineHeaders(this.config.headers(), options.headers),
+        body,
+        failedResponseHandler: this.failedResponseHandler,
+        successfulResponseHandler: createEventSourceResponseHandler(
+          this.chunkSchema,
+        ),
+        abortSignal: options.abortSignal,
+        fetch: this.config.fetch,
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
-      body,
-      failedResponseHandler: this.failedResponseHandler,
-      successfulResponseHandler: createEventSourceResponseHandler(
-        this.chunkSchema,
-      ),
-      abortSignal: options.abortSignal,
-      fetch: this.config.fetch,
-    })
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal: options.abortSignal,
+      },
+    )
 
     let finishReason: LanguageModelV3FinishReason = { unified: "other", raw: undefined }
     let usage: LanguageModelV3Usage = buildUsage(undefined, undefined)

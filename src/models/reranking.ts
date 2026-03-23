@@ -13,6 +13,7 @@ import {
 } from "@ai-sdk/provider-utils"
 import { z } from "zod"
 import { defaultQwenErrorStructure } from "../error"
+import { isRetryableQwenRequestError, withRetries } from "../utils/retry"
 
 export interface QwenRerankingConfig {
   provider: string
@@ -194,19 +195,26 @@ export class QwenRerankingModel implements RerankingModelV3 {
     // Note: endpoint is /compatible-api/v1/reranks (not /compatible-mode/v1/rerank)
     const url = `${this.config.baseURL}/compatible-api/v1/reranks`
 
-    const { responseHeaders, value: response } = await postJsonToApi({
-      url,
-      headers: combineHeaders(this.config.headers(), headers),
-      body,
-      failedResponseHandler: createJsonErrorResponseHandler(
-        this.config.errorStructure ?? defaultQwenErrorStructure,
-      ),
-      successfulResponseHandler: createJsonResponseHandler(
-        openaiCompatibleRerankingResponseSchema,
-      ),
-      abortSignal,
-      fetch: this.config.fetch,
-    })
+    const { responseHeaders, value: response } = await withRetries(
+      () => postJsonToApi({
+        url,
+        headers: combineHeaders(this.config.headers(), headers),
+        body,
+        failedResponseHandler: createJsonErrorResponseHandler(
+          this.config.errorStructure ?? defaultQwenErrorStructure,
+        ),
+        successfulResponseHandler: createJsonResponseHandler(
+          openaiCompatibleRerankingResponseSchema,
+        ),
+        abortSignal,
+        fetch: this.config.fetch,
+      }),
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal,
+      },
+    )
 
     return {
       ranking: response.results.map(result => ({
@@ -265,19 +273,26 @@ export class QwenRerankingModel implements RerankingModelV3 {
     // DashScope reranking uses native API endpoint
     const url = `${this.config.baseURL}/api/v1/services/rerank/text-rerank/text-rerank`
 
-    const { responseHeaders, value: response } = await postJsonToApi({
-      url,
-      headers: combineHeaders(this.config.headers(), headers),
-      body,
-      failedResponseHandler: createJsonErrorResponseHandler(
-        this.config.errorStructure ?? defaultQwenErrorStructure,
-      ),
-      successfulResponseHandler: createJsonResponseHandler(
-        dashscopeRerankingResponseSchema,
-      ),
-      abortSignal,
-      fetch: this.config.fetch,
-    })
+    const { responseHeaders, value: response } = await withRetries(
+      () => postJsonToApi({
+        url,
+        headers: combineHeaders(this.config.headers(), headers),
+        body,
+        failedResponseHandler: createJsonErrorResponseHandler(
+          this.config.errorStructure ?? defaultQwenErrorStructure,
+        ),
+        successfulResponseHandler: createJsonResponseHandler(
+          dashscopeRerankingResponseSchema,
+        ),
+        abortSignal,
+        fetch: this.config.fetch,
+      }),
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal,
+      },
+    )
 
     return {
       ranking: response.output.results.map(result => ({

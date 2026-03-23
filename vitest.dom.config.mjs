@@ -1,13 +1,11 @@
 import tsconfigPaths from "vite-tsconfig-paths"
 import { defineConfig } from "vitest/config"
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
-    environment: "edge-runtime",
+    environment: "jsdom",
     globals: true,
-    include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["**/node_modules/**", "**/dist/**", "src/__tests__/react/**"],
+    include: ["src/__tests__/react/**/*.test.tsx"],
   },
 })

@@ -8,5 +8,6 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
+    exclude: ["**/node_modules/**", "**/dist/**", "src/__tests__/react/**"],
   },
 })

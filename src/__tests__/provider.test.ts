@@ -9,19 +9,19 @@ import { createQwen } from "../provider"
 vi.stubEnv("DASHSCOPE_API_KEY", "test-api-key-123")
 
 // Mock the model classes
-vi.mock("../models/chat-language-model", () => ({
+vi.mock("../models/chat", () => ({
   QwenChatLanguageModel: vi.fn(),
 }))
 
-vi.mock("../models/completion-language-model", () => ({
+vi.mock("../models/completion", () => ({
   QwenCompletionLanguageModel: vi.fn(),
 }))
 
-vi.mock("../models/embedding-model", () => ({
+vi.mock("../models/embedding", () => ({
   QwenEmbeddingModel: vi.fn(),
 }))
 
-vi.mock("../models/reranking-model", () => ({
+vi.mock("../models/reranking", () => ({
   QwenRerankingModel: vi.fn(),
 }))
 

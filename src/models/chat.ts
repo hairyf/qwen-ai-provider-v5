@@ -1,4 +1,5 @@
 import type {
+  APICallError,
   LanguageModelV3,
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
@@ -15,7 +16,7 @@ import type {
 import type { QwenChatModelId, QwenChatSettings } from "../config/chat"
 import type { QwenErrorStructure } from "../error"
 import type { MetadataExtractor } from "../utils/metadata-extractor"
-import { APICallError, InvalidResponseDataError } from "@ai-sdk/provider"
+import { InvalidResponseDataError } from "@ai-sdk/provider"
 import {
   combineHeaders,
   createEventSourceResponseHandler,
@@ -31,6 +32,7 @@ import { buildUsage } from "../utils/build-usage"
 import { convertToQwenChatMessages } from "../utils/convert-to-chat-messages"
 import { getResponseMetadata } from "../utils/get-response-metadata"
 import { mapQwenFinishReason } from "../utils/map-finish-reason"
+import { isRetryableQwenRequestError, withRetries } from "../utils/retry"
 
 /**
  * Configuration for the Qwen Chat Language Model.
@@ -314,20 +316,27 @@ export class QwenChatLanguageModel implements LanguageModelV3 {
       responseHeaders,
       value: responseBody,
       rawValue: parsedBody,
-    } = await postJsonToApi({
-      url: this.config.url({
-        path: "/chat/completions",
-        modelId: this.modelId,
+    } = await withRetries(
+      () => postJsonToApi({
+        url: this.config.url({
+          path: "/chat/completions",
+          modelId: this.modelId,
+        }),
+        headers: combineHeaders(this.config.headers(), options.headers),
+        body: args,
+        failedResponseHandler: this.failedResponseHandler,
+        successfulResponseHandler: createJsonResponseHandler(
+          QwenChatResponseSchema,
+        ),
+        abortSignal: options.abortSignal,
+        fetch: this.config.fetch,
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
-      body: args,
-      failedResponseHandler: this.failedResponseHandler,
-      successfulResponseHandler: createJsonResponseHandler(
-        QwenChatResponseSchema,
-      ),
-      abortSignal: options.abortSignal,
-      fetch: this.config.fetch,
-    })
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal: options.abortSignal,
+      },
+    )
 
     const choice = responseBody.choices[0]
     const providerMetadata = this.config.metadataExtractor?.extractMetadata?.({
@@ -473,20 +482,6 @@ export class QwenChatLanguageModel implements LanguageModelV3 {
     const metadataExtractor
       = this.config.metadataExtractor?.createStreamExtractor()
 
-    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
-    const shouldRetryQwenStreamRequest = (error: unknown): boolean => {
-      if (!APICallError.isInstance(error))
-        return false
-      if (error.statusCode !== 500)
-        return false
-
-      const message = String(error.message ?? "")
-      return (
-        message.includes("list index out of range")
-        && (message.includes("InternalServerError") || message.toLowerCase().includes("internal server error"))
-      )
-    }
-
     const request = () => postJsonToApi({
       url: this.config.url({
         path: "/chat/completions",
@@ -502,25 +497,14 @@ export class QwenChatLanguageModel implements LanguageModelV3 {
       fetch: this.config.fetch,
     })
 
-    const maxRetries = 3
-    let responseHeaders: Record<string, string> | undefined
-    let response: any
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const result = await request()
-        responseHeaders = result.responseHeaders
-        response = result.value
-        break
-      }
-      catch (error) {
-        if (attempt === maxRetries || !shouldRetryQwenStreamRequest(error)) {
-          throw error
-        }
-        // Keep it short: retry only for the known Qwen stream boundary failure.
-        await sleep(100 * (attempt + 1))
-      }
-    }
+    const { responseHeaders, value: response } = await withRetries(
+      request,
+      {
+        maxRetries: 3,
+        shouldRetry: isRetryableQwenRequestError,
+        abortSignal: options.abortSignal,
+      },
+    )
 
     const toolCalls: Array<{
       id: string

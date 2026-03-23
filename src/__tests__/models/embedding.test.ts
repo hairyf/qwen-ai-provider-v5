@@ -169,4 +169,52 @@ describe("doEmbed", () => {
       async () => await model.doEmbed({ values: many }),
     ).rejects.toBeInstanceOf(TooManyEmbeddingValuesForCallError)
   })
+
+  it("should retry embed request on retryable errors", async () => {
+    vi.useFakeTimers()
+
+    let fetchCalls = 0
+
+    const provider = createQwen({
+      baseURL: "https://my.api.com/v1/",
+      headers: {
+        Authorization: `Bearer test-api-key`,
+      },
+      fetch: async (_url, init) => {
+        fetchCalls++
+        if (init?.body) {
+          requestBody = JSON.parse(init.body as string)
+        }
+
+        if (fetchCalls === 1) {
+          return new Response(JSON.stringify({
+            object: "error",
+            message: "Service Unavailable",
+            type: "ServiceUnavailable",
+            param: null,
+            code: null,
+          }), {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          })
+        }
+
+        return new Response(JSON.stringify(responseBody), {
+          headers: responseHeaders,
+        })
+      },
+    })
+
+    const model = provider.textEmbeddingModel("text-embedding-3-large")
+    const promise = model.doEmbed({ values: testValues })
+
+    await vi.runAllTimersAsync()
+
+    const { embeddings } = await promise
+    expect(embeddings).toStrictEqual(dummyEmbeddings)
+    expect(fetchCalls).toBe(2)
+    expect(requestBody).toMatchObject({ model: "text-embedding-3-large" })
+
+    vi.useRealTimers()
+  })
 })

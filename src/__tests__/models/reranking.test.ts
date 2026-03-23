@@ -264,6 +264,62 @@ describe("doRerank", () => {
 
     expect(warnings).toStrictEqual([])
   })
+
+  it("should retry rerank request on retryable errors", async () => {
+    vi.useFakeTimers()
+
+    let fetchCalls = 0
+
+    const provider = createQwen({
+      baseURL: "https://my.api.com/compatible-mode/v1",
+      headers: {
+        Authorization: `Bearer test-api-key`,
+      },
+      fetch: async (url, init) => {
+        fetchCalls++
+        requestUrl = url as string
+        if (init?.body) {
+          requestBody = JSON.parse(init.body as string)
+        }
+
+        if (fetchCalls === 1) {
+          return new Response(JSON.stringify({
+            object: "error",
+            message: "Bad Gateway",
+            type: "BadGateway",
+            param: null,
+            code: null,
+          }), {
+            status: 502,
+            headers: { "content-type": "application/json" },
+          })
+        }
+
+        const bodyLength = JSON.stringify(responseBody).length
+        return new Response(JSON.stringify(responseBody), {
+          headers: {
+            ...responseHeaders,
+            "content-length": bodyLength.toString(),
+          },
+        })
+      },
+    })
+
+    const model = provider.rerankingModel("gte-rerank-v2")
+    const promise = model.doRerank({
+      documents: { type: "text", values: testDocuments },
+      query: "talk about rain",
+    })
+
+    await vi.runAllTimersAsync()
+
+    const { ranking } = await promise
+    expect(ranking).toHaveLength(3)
+    expect(fetchCalls).toBe(2)
+    expect(requestUrl).toBe("https://my.api.com/api/v1/services/rerank/text-rerank/text-rerank")
+
+    vi.useRealTimers()
+  })
 })
 
 describe("doRerank with qwen3-rerank (OpenAI-compatible format)", () => {
