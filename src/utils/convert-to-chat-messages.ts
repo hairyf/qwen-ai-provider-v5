@@ -2,7 +2,7 @@ import type {
   LanguageModelV3Prompt,
   SharedV3ProviderOptions,
 } from "@ai-sdk/provider"
-import type { QwenChatPrompt } from "./qwen-api-types"
+import type { QwenChatPrompt } from "../types/api-types"
 import { UnsupportedFunctionalityError } from "@ai-sdk/provider"
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils"
 

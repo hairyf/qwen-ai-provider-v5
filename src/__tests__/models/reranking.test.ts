@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { createQwen } from "../qwen-provider"
+import { createQwen } from "../../provider"
 
 const dummyRankingResults = [
   { index: 1, relevance_score: 0.95 },

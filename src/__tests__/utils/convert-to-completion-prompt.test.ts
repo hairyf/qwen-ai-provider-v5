@@ -1,6 +1,6 @@
 import { InvalidPromptError, UnsupportedFunctionalityError } from "@ai-sdk/provider"
 import { describe, expect, it } from "vitest"
-import { convertToQwenCompletionPrompt } from "../convert-to-qwen-completion-prompt"
+import { convertToQwenCompletionPrompt } from "../../utils/convert-to-completion-prompt"
 
 describe("convertToQwenCompletionPrompt", () => {
   it("returns raw text when inputFormat is 'prompt' with single user text", () => {

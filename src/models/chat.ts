@@ -12,9 +12,9 @@ import type {
   ParseResult,
   ResponseHandler,
 } from "@ai-sdk/provider-utils"
-import type { QwenChatModelId, QwenChatSettings } from "./qwen-chat-settings"
-import type { QwenErrorStructure } from "./qwen-error"
-import type { MetadataExtractor } from "./qwen-metadata-extractor"
+import type { QwenChatModelId, QwenChatSettings } from "../config/chat"
+import type { QwenErrorStructure } from "../error"
+import type { MetadataExtractor } from "../utils/metadata-extractor"
 import { APICallError, InvalidResponseDataError } from "@ai-sdk/provider"
 import {
   combineHeaders,
@@ -26,11 +26,11 @@ import {
   postJsonToApi,
 } from "@ai-sdk/provider-utils"
 import { z } from "zod"
-import { buildUsage } from "./build-usage"
-import { convertToQwenChatMessages } from "./convert-to-qwen-chat-messages"
-import { getResponseMetadata } from "./get-response-metadata"
-import { mapQwenFinishReason } from "./map-qwen-finish-reason"
-import { defaultQwenErrorStructure } from "./qwen-error"
+import { defaultQwenErrorStructure } from "../error"
+import { buildUsage } from "../utils/build-usage"
+import { convertToQwenChatMessages } from "../utils/convert-to-chat-messages"
+import { getResponseMetadata } from "../utils/get-response-metadata"
+import { mapQwenFinishReason } from "../utils/map-finish-reason"
 
 /**
  * Configuration for the Qwen Chat Language Model.
